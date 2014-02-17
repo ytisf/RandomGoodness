@@ -1,0 +1,558 @@
+#!/bin/bash
+
+#	This program flushes all rules of IPTables and created new protections. 
+#	Copyright (C) 2013  Yuval Nativ of See-Security Technologies
+#
+#	This program is free software: you can redistribute it and/or modify
+#	it under the terms of the GNU General Public License as published by
+#	the Free Software Foundation, either version 3 of the License, or
+#	at your option) any later version.
+#
+#	This program is distributed in the hope that it will be useful,
+#	but WITHOUT ANY WARRANTY; without even the implied warranty of
+#	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#	GNU General Public License for more details.
+#
+#	You should have received a copy of the GNU General Public License
+#	along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#	Thanks to Doudou Broda for the great tips and instructions.
+#	Thanks to Bar Hofesh for a few neat tricks in this script. :)
+#	Thanks to Tzakhi Malka for the list of Israeli IP addresses
+
+# WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   
+# WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   
+# WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   
+
+#This script will remove all IPTable rules and create new ones. It may cause and will
+#cause system malfunctions and failing communications unless configured to your needs. 
+
+# WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   
+# WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   
+# WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   WARNING !!!   
+
+# Banner & Prompt
+	echo ""
+	echo "IPTables Protector - For Israel"
+	echo "Copyright (C) 2013  Yuval Nativ of See-Security Technologies."
+	echo "This program comes with ABSOLUTELY NO WARRANTY;"
+	echo "This is free software, and you are welcome to redistribute it"
+	echo ""
+	echo "--------------------------------------------------------"
+	echo "---------------------- WARNING!!! ----------------------"
+	echo "---------------------- WARNING!!! ----------------------"
+	echo "---------------------- WARNING!!! ----------------------"
+	echo "--------------------------------------------------------"
+	echo ""
+	echo "You are about to clean wipe and rewrite your IPTABLES, "
+	read -p "Are you sure you wish to continue? [Type capital 'YES'] "
+	if [ "$REPLY" != "YES" ]; then
+	   echo "Got a negative. Exiting."
+	   echo ""
+	   exit
+	fi
+
+# Checks if root
+if [[ $EUID -ne 0 ]]; then
+   echo "This script must be run as root" 1>&2
+   exit 1
+fi
+
+exit 1 # !!! Comment me to let the script run. Just to make sure you've read the comments.
+
+# Configuring locations.
+	IPTABLES="/sbin/$IPTABLES"
+	#IPTPABLES="/sbin/$IPTABLES -v" for debugging...
+	IP6TABLES="/sbin/ip6tables"
+	MODPROBE="/sbin/modprobe"
+	RMMOD="/sbin/rmmod"
+	ARP="/usr/sbin/arp"
+	iptables-save > iptables_backup.conf # will backup iptables current rules before starting
+
+# Logistics
+	LOG="LOG --log-level debug --log-tcp-sequence --log-tcp-options"
+	LOG="$LOG --log-ip-options"
+	PHIGH="1024:65535"
+	PSSH="1000:1023"
+	$MODPROBE ip_conntrack_ftp
+	$MODPROBE ip_conntrack_irc
+ 
+# What is DDoS?
+	RLIMIT="-m limit --limit 3/s --limit-burst 8"
+
+
+
+##############  Basic Protections  #################
+# No IP Forwarding
+	echo 1 > /proc/sys/net/ipv4/ip_forward
+	echo 0 > /proc/sys/net/ipv4/ip_forward
+
+	for i in /proc/sys/net/ipv4/conf/*/rp_filter; do echo 1 > $i; done 		# IP spoofing protection
+	echo 1 > /proc/sys/net/ipv4/tcp_syncookies									# SYN flood attacks
+	echo 0 > /proc/sys/net/ipv4/icmp_echo_ignore_all							# Ping floods
+	echo 1 > /proc/sys/net/ipv4/icmp_echo_ignore_broadcasts						# Don't forget abotu pings to broadcast
+	for i in /proc/sys/net/ipv4/conf/*/log_martians; do echo 1 > $i; done		# Spoofed IP (invalid address)
+	for i in /proc/sys/net/ipv4/conf/*/accept_redirects; do echo 0 > $i; done	# ICMP Redirections (drop)
+	for i in /proc/sys/net/ipv4/conf/*/secure_redirects; do echo 1 > $i; done	# Only secure ICMP redirections
+	echo "10" > /proc/sys/net/ipv4/tcp_fin_timeout								# Avoid leaving ports half-open
+	# The above feature needs to be carefully adjusted to the network and service! It may caus problems. 
+
+
+
+##############  Basic Policies  #################
+ 
+# Drop everything by default - Whitelist Policy
+	$IPTABLES -P INPUT DROP
+	$IPTABLES -P FORWARD DROP
+	$IPTABLES -P OUTPUT DROP
+ 
+# NAT + Mangle tables to ACCEPT
+	$IPTABLES -t nat -P PREROUTING ACCEPT
+	$IPTABLES -t nat -P OUTPUT ACCEPT
+	$IPTABLES -t nat -P POSTROUTING ACCEPT
+	$IPTABLES -t mangle -P PREROUTING ACCEPT
+	$IPTABLES -t mangle -P INPUT ACCEPT
+	$IPTABLES -t mangle -P FORWARD ACCEPT
+	$IPTABLES -t mangle -P OUTPUT ACCEPT
+	$IPTABLES -t mangle -P POSTROUTING ACCEPT
+ 
+
+
+##############  Just Confs  #################
+
+# Log everything before proccessing...
+
+	$IPTABLES -N ACCEPTLOG
+	$IPTABLES -A ACCEPTLOG -j $LOG $RLIMIT --log-prefix "ACCEPT "
+	$IPTABLES -A ACCEPTLOG -j ACCEPT
+	$IPTABLES -N DROPLOG
+	$IPTABLES -A DROPLOG -j $LOG $RLIMIT --log-prefix "DROP "
+	$IPTABLES -A DROPLOG -j DROP
+	$IPTABLES -N REJECTLOG
+	$IPTABLES -A REJECTLOG -j $LOG $RLIMIT --log-prefix "REJECT "
+	$IPTABLES -A REJECTLOG -p tcp -j REJECT --reject-with tcp-reset
+	$IPTABLES -A REJECTLOG -j REJECT
+ 
+
+
+##############  Main Policies  #################
+
+# Fragmented ICMPs are bad for you
+	$IPTABLES -A INPUT -p icmp --fragment -j DROPLOG
+	$IPTABLES -A OUTPUT -p icmp --fragment -j DROPLOG
+	$IPTABLES -A FORWARD -p icmp --fragment -j DROPLOG
+ 
+	$IPTABLES -A INPUT -p icmp --icmp-type echo-request -j ACCEPT $RLIMIT		# Limit incoming pings
+	$IPTABLES -A OUTPUT -p icmp --icmp-type echo-request -j ACCEPT $RLIMIT		# Limit outgoing pings
+ 
+# Drop any other ICMP traffic.
+	$IPTABLES -A INPUT -p icmp -j DROPLOG
+	$IPTABLES -A OUTPUT -p icmp -j DROPLOG
+	$IPTABLES -A FORWARD -p icmp -j DROPLOG
+
+# Internal porst that should not be accessed remotely
+	$IPTABLES -A INPUT -p tcp -m multiport --dports 135,137,138,139,445,1433,1434 -j DROP
+	$IPTABLES -A INPUT -p udp -m multiport --dports 135,137,138,139,445,1433,1434 -j DROP
+ 
+# Drop invalid incoming traffic
+	$IPTABLES -A INPUT -m state --state INVALID -j DROP
+
+# Kill Port scans
+	$IPTABLES -A INPUT -m state --state NEW -p tcp --tcp-flags ALL ALL -j DROP
+	$IPTABLES -A INPUT -m state --state NEW -p tcp --tcp-flags ALL NONE -j DROP
+
+# Protect from ARP based MiTM just fill out the table
+	# $ARP -s IP-ADDRESS MAC-ADDRESS
+	# $ARP -s IP-ADDRESS MAC-ADDRESS
+	# $ARP -s IP-ADDRESS MAC-ADDRESS
+	# $ARP -s IP-ADDRESS MAC-ADDRESS
+
+
+
+##############  White List  #################
+
+# Basic Information
+	$IPTABLES -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+	$IPTABLES -A INPUT -i lo -j ACCEPT
+	$IPTABLES -A OUTPUT -o lo -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW,ESTABLISHED,RELATED -j ACCEPT
+
+# Outgoing Data (try to disable as much as you can)
+	$IPTABLES -A OUTPUT -m state --state NEW -p udp --dport 53 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 53 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 80 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 465 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 587 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 995 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 22 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 21 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 8080 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 8090 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 3306 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p tcp --dport 3690 -j ACCEPT
+	$IPTABLES -A OUTPUT -m state --state NEW -p udp --dport 1194 -j ACCEPT
+
+# Incoming ports - all are disabled - uncomment the ones you need ( or add )
+
+	# $IPTABLES -A INPUT -m state --state NEW -p udp --dport 53 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 53 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 80 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 443 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 110 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 143 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 995 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 25 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 22 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 21 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 119 -j ACCEPT
+	# $IPTABLES -A INPUT -m state --state NEW -p tcp --dport 3306 -j ACCEPT
+
+# Accept Incoming Connections from Israel 
+	$IPTABLES -A INPUT -s 2.52.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.22.128.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.28.128.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.29.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.34.168.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.100.248.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.102.192.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.104.240.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 5.144.48.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 31.25.112.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 31.44.128.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 31.154.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 31.168.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 31.210.176.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.19.112.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.26.144.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.46.32.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.60.40.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.61.224.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.122.152.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 37.142.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.19.80.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.31.96.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.116.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.120.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.183.88.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.210.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 46.228.144.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 62.0.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 62.90.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 62.128.32.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 62.219.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 77.124.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 79.176.0.0/13 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.70.128.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.74.96.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.178.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.230.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.244.160.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.246.128.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 80.250.144.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 81.5.0.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 81.218.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 82.80.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 82.102.128.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 82.166.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 83.130.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 84.94.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 84.108.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 84.228.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 85.64.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 85.130.128.0/17 -j ACCEPT
+	$IPTABLES -A INPUT -s 85.159.160.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 85.250.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 87.68.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 89.138.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.90.128.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.135.96.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.143.224.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.193.48.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.194.4.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.194.114.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.195.162.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.197.60.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.197.100.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.198.5.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.198.70.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.198.129.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.198.205.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.198.254.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.29.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.53.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.69.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.94.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.99.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.100.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.199.119.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.200.144.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.202.168.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.205.152.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.206.170.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.207.34.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.207.90.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.207.206.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.207.240.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.86.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.118.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.129.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.139.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.140.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.147.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.208.218.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.209.113.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.209.182.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.212.76.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.212.114.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.212.189.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.213.176.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.214.100.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.216.31.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.216.222.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.216.252.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.217.219.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.220.9.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.220.22.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.220.193.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.223.11.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.223.54.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.223.106.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.226.245.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.227.70.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.227.164.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.228.126.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.228.162.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.228.248.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.230.79.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.230.236.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.231.192.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.235.107.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.235.150.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.237.251.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.239.218.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.240.146.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.240.234.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 91.246.218.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 92.61.224.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 92.240.0.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 93.94.40.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 93.157.80.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 93.172.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 93.175.32.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 94.159.128.0/17 -j ACCEPT
+	$IPTABLES -A INPUT -s 94.188.128.0/17 -j ACCEPT
+	$IPTABLES -A INPUT -s 94.230.80.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 95.35.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 95.86.64.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 95.129.32.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 95.142.16.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 95.175.32.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.64.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.73.160.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.95.128.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.160.128.0/17 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.186.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.226.0.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.234.16.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 109.253.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 128.139.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 132.64.0.0/13 -j ACCEPT
+	$IPTABLES -A INPUT -s 132.72.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 132.76.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 132.78.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 138.134.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 141.226.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 146.185.56.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 147.161.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 147.233.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 147.234.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 147.236.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 149.49.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 149.126.72.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 159.253.248.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 164.138.112.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 176.12.128.0/17 -j ACCEPT
+	$IPTABLES -A INPUT -s 176.13.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 176.106.224.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 176.228.0.0/14 -j ACCEPT
+	$IPTABLES -A INPUT -s 176.241.112.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 178.249.104.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.3.144.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.6.64.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.10.4.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.10.64.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.11.44.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.11.124.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.13.192.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 185.16.88.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 188.64.96.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 188.64.200.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 188.120.128.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.54.204.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.86.25.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.86.89.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.114.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.116.0.0/15 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.118.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.132.244.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.133.36.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.160.252.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.189.70.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.206.86.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.206.222.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.206.224.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 192.206.226.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.16.147.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.16.238.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.17.42.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.17.68.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.17.74.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.22.80.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.27.92.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.28.155.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.30.161.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.33.16.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.33.234.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.34.56.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.36.176.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.37.128.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.37.130.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.39.79.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.41.202.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.41.208.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.43.244.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.46.64.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.47.165.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.47.248.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.44.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.62.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.77.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.115.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.117.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.119.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.104.147.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.105.99.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.105.199.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.105.203.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.106.52.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.106.204.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.108.195.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.108.211.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.109.82.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.110.48.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.138.92.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.142.151.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.150.127.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.169.70.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.169.88.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.169.104.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.169.246.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.178.220.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.186.2.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.200.30.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.200.154.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.201.155.128/25 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.218.207.128/25 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.222.129.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.238.188.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.238.208.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.239.108.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.242.220.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.243.183.128/26 -j ACCEPT
+	$IPTABLES -A INPUT -s 193.254.206.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.1.145.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.8.76.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.8.88.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.29.32.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.31.58.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.50.71.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.50.175.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.54.168.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.56.215.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.88.136.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.90.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.110.249.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.114.146.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.116.226.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.116.230.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.150.218.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.153.101.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.177.16.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.187.84.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.213.4.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.213.108.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.242.24.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 194.247.166.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.10.194.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.10.220.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.10.222.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.18.8.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.22.148.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.28.166.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.28.180.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.47.252.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.60.176.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.60.232.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.62.18.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.62.30.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.66.118.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.72.116.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.72.120.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.82.128.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.85.254.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.93.234.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.95.183.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.110.40.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.128.145.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.128.176.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.137.164.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.160.240.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.162.66.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.182.33.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.189.140.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.189.192.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.190.19.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.190.23.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.191.52.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.200.205.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.211.68.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.216.252.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.225.46.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.234.26.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.234.158.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.242.118.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.244.22.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 195.250.33.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 204.52.208.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 209.88.155.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 209.88.156.0/23 -j ACCEPT
+	$IPTABLES -A INPUT -s 209.88.158.0/24 -j ACCEPT
+	$IPTABLES -A INPUT -s 209.88.172.0/22 -j ACCEPT
+	$IPTABLES -A INPUT -s 209.88.176.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 209.88.192.0/21 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.25.64.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.29.192.0/18 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.68.128.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.76.96.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.116.160.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.117.128.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.143.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.150.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.179.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.199.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 212.235.0.0/17 -j ACCEPT
+	$IPTABLES -A INPUT -s 213.8.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 213.57.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 213.151.32.0/19 -j ACCEPT
+	$IPTABLES -A INPUT -s 217.22.112.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 217.65.32.0/20 -j ACCEPT
+	$IPTABLES -A INPUT -s 217.132.0.0/16 -j ACCEPT
+	$IPTABLES -A INPUT -s 217.194.192.0/20 -j ACCEPT
+	echo ""
+	echo " IPTables updated. "
+	echo " Configurations are saved to iptables_backup.conf ."
+	echo " You can revert to previous settings using 'iptables-restore < iptables_backup.conf'"
+	echo ""
+ 
+exit 0
