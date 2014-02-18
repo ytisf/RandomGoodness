@@ -14,8 +14,6 @@ Will create a bunch of IP addresses based on the rule sets of IPv4. My main use 
 A honeypot to capture sudo credentials written by a pupil of mine, Barak.
 ## iptables_BlockAllButFromIsrael.sh
 A little script we have released prior to 7th of April 2012 to stop denial of service attacks and block connections from IPs which are not listed as Israel IP addresses. Bear in mind that this will delete all prior iptables rules. 
-## MD5_Collusion_Finder.py
-Nothing to say. Does what it says it does. 
 
 
 GPL 3
