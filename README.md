@@ -14,6 +14,8 @@ Will create a bunch of IP addresses based on the rule sets of IPv4. My main use 
 A honeypot to capture sudo credentials written by a pupil of mine, Barak.
 ## iptables_BlockAllButFromIsrael.sh
 A little script we have released prior to 7th of April 2012 to stop denial of service attacks and block connections from IPs which are not listed as Israel IP addresses. Bear in mind that this will delete all prior iptables rules. 
+## NetworkMapper.sh
+A little script to help locating hosts on the net using arp-scan and then sending it to nmap to save time on your infrastructure pentest. 
 
 
 GPL 3
