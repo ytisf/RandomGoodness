@@ -1,7 +1,3 @@
-#!/usr/bin/env python
-
-# Please notice you might have to pip install evdev
-
 import sys
 import time
 import signal
@@ -22,7 +18,7 @@ def send_keys(object, key):
 i = 5
 moves = 100000
 
-print("Go to 2048 window. [#{i}] secs.")
+print("Go to 2048 window. ["+str(i)+"] secs.")
 while i != 0:
 	print(" " + str(i))
 	time.sleep(1)
