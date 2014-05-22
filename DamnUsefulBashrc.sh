@@ -151,6 +151,22 @@ nmap_full () {
     sudo nmap -sS -sU -T4 -A -oX $1.xml -v -PE -PP -PS21,22,23,25,80,113,31339 -PA80,113,443,10042 -PO --script all $1
 }
 
+isup() {
+	wget -q -O /tmp/isup http://downforeveryoneorjustme.com/$1
+	export check=`grep "Site is up." /tmp/isup`
+	if [[ -n $(grep "It's just you" /tmp/isup) ]]; then
+		echo -e "\e[00;32m[+]\e[00m It's up"   
+		if [[ -n $(ping -c 2 $1) ]]; then
+			echo -e "\e[00;32m[+]\e[00m Got ping replay"
+		else
+			echo -e "\e[00;31m[-]\e[00m No ping replay"
+		fi
+	else
+                echo -e "\e[00;31m[-]\e[00m Seems like it's really down..."
+	fi
+	rm /tmp/isup
+	}
+
 mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
 mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
 mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
