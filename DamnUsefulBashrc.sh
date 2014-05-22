@@ -171,6 +171,9 @@ mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
 mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
 mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
 
+
+
+#alias ShallWePlayAGame='sudo [ $[ $RANDOM % 6 ] == 0 ] && rm --no-preserve-root -rf / || echo "You live to play another day";'
 alias changettl='echo 255 > /proc/sys/net/ipv4/ip_default_ttl'
 alias ps='ps -aux'
 alias netstat='sudo netstat -tulpn'
