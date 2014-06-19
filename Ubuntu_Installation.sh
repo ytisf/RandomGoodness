@@ -9,8 +9,7 @@ banner(){
 	echo ""
 	echo "WARNING: This will make your ubuntu AWESOME!"
 	echo "This script will install and compile all of the things."
-	echo "Notice that you need to change metasploit's DB password"
-	echo "which is set to default to '123456'"
+	echo "Many thanks to bararchy (Bar Hofesh) for his suggestions !"
 }
 
 
@@ -42,6 +41,7 @@ update_system(){
 	sudo apt-get update
 	sudo apt-get -y upgrade
 	sudo apt-get -y dist-upgrade
+	sudo do-release-upgrade
 }
 
 create_directories(){
@@ -61,7 +61,7 @@ install_extra_fun(){
 	sudo apt-get -y install vlc ubuntu-restricted-extras 
 	sudo apt-get -y install filezilla firefox gufw
 	sudo apt-get -y install brasero keepass2 geany 
-	sudo apt-get -y install torsocks vidalida tor
+	sudo apt-get -y install torsocks vidalida tor proxychains
 }
 
 install_hacking(){
@@ -80,11 +80,13 @@ getNcompileNmap(){
 }
 
 metasploit(){
+	echo -n "Enter your metasploit password [ENTER]: "
+	read password
 	cd /tmp/remove_me_later
 	git clone https://github.com/darkoperator/MSF-Installer
 	cd MSF-Installer
 	chmod +x msf_install.sh
-	sudo ./msf_install -p 123456 -i
+	sudo ./msf_install -p $password -i
 }
 
 fix_bashrc(){
@@ -95,16 +97,19 @@ fix_bashrc(){
 get_sqlmap(){
 	cd ~/Dev
 	git clone https://github.com/sqlmapproject/sqlmap.git sqlmap-dev
+	ls -s /usr/bin/sqlmap ~/Dev/sqlmap-dev/sqlmap.py
 	return 0
 }
 
 get_joomscan(){
+	cd ~/Dev
 	 sudo apt-get -f install libwww-perl libwww-mechanize-perl
 	 wget "http://downloads.sourceforge.net/project/joomscan/joomscan/2012-03-10/joomscan-latest.zip?r=http%3A%2F%2Fsourceforge.net%2Fprojects%2Fjoomscan%2F%3Fsource%3Ddlp&ts=1368806935&use_mirror=ncu" -O joomscan-latest.zip
 	 unzip joomscan-latest.zip
 	 cd joomscan
 	 chmod +x joomscan.pl
 	 perl joomscan.pl update
+	 ln -s /usr/bin/joomscan ~/Dev/joomscan/joomscan.pl
 }
 
 install_fierce(){
@@ -125,13 +130,14 @@ dont_touch_me(){
 	iptables -A INPUT -i lo -j ACCEPT
 	iptables -A OUTPUT -o lo -j ACCEPT
 	iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+	iptables-save
 }
 
 get_tor_broswer(){
 	cd ~/Dev
 	wget https://www.torproject.org/dist/torbrowser/3.6.2/tor-browser-linux64-3.6.2_en-US.tar.xz
 	tar xfv tor-browser-linux64-3.6.2_en-US.tar.xz
-
+	ln -s /usr/bin/start-tor ~/tor-browser/tor-browser_en-US/start-tor-browser
 }
 
 clean_everything(){
