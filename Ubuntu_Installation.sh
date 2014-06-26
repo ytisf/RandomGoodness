@@ -55,6 +55,7 @@ install_basics(){
 	sudo apt-get -y install git subversion build-essential
 	sudo apt-get -y install gcc libssl-dev python2.7-dev ruby1.9.3
 	sudo apt-get -y install rar gparted p7zip-full figlet
+	sudo apt-get -y install mtp-tools mtpfs 	# Allow your machine to mount MTP such as Android.
 }
 
 install_extra_fun(){
