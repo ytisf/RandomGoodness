@@ -2,6 +2,8 @@
 # see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
 # for examples
 
+# current_version=1.0.3
+
 ##########################################################################################
 ################################## Standard bashrc #######################################
 ##########################################################################################
@@ -171,7 +173,25 @@ mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
 mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
 mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
 
-
+bashrc-update(){
+    cd /tmp
+    wget https://raw.githubusercontent.com/ytisf/RandomGoodness/master/DamnUsefulBashrc.sh
+    $current = `cat ~/.bashrc | grep current_version`
+    $latest = `cat /tmp/DamnUsefulBashrc.sh | grep current_version`
+    if [$current = $latest]; then
+        echo "You are at the latest version of bashrc"
+    else
+        read -p "Continuing will delete your current bashrc. Continue (y/n)?" CONT
+        if [ "$CONT" == "y" ]; then
+            cp /tmp/DamnUsefulBashrc.sh ~/.bashrc
+            echo "You are now at the latest version of bashrc"
+        else
+            echo "Not upgrading. \nQuiting now."
+            echo "You can manually copy from /tmp/DamnUsefulBashrc.sh"
+        fi
+        
+    fi
+}
 
 #alias ShallWePlayAGame='sudo [ $[ $RANDOM % 6 ] == 0 ] && rm --no-preserve-root -rf / || echo "You live to play another day";'
 alias changettl='echo 255 > /proc/sys/net/ipv4/ip_default_ttl'
