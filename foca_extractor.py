@@ -3,7 +3,7 @@
 import os
 import zipfile
 
-FILENAME = 'meitavdash.co.il.FOCA'
+FILENAME = '.FOCA'
 READONLY = 'r'
 WRITE_BINARY = 'wb'
 CURRENT_DIR = '.'
