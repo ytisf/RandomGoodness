@@ -201,6 +201,7 @@ alias ls='/bin/ls --color=auto -CFX'
 alias df='/bin/df -kHl'
 alias traceroute='traceroute -I'
 alias back='cd $OLDPWD'
+alias clipit=' xclip -selection clipboad'
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
