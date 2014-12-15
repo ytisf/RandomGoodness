@@ -209,6 +209,7 @@ alias .....="cd ../../../.."
 alias ......="cd ../../../../.."
 alias fuck='sudo $(history -p \!\!)' # # Thanks to barachy who linked to nixCraft's
 alias myip="`ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p'`"
+alias what_am_i_doing="history | awk '{h[$2]++}END{for(i in h){print h[i],i|\"sort -rn|head -20\"}}' |awk '!max{max=$1;}{r=\"\";i=s=60*$1/max;while(i-->0)r=r"#";printf \"%15s %5d %s %s\",$2,$1,r,\"\n\";}'"
 
 PS1='\[\e[1;35m\]\u\[\e[m\] \[\e[1;36m\]\w\[\e[m\] \[\e[1;32m\]> \[\e[m\]\[\e[0;37m\]'
 PS2='>'
