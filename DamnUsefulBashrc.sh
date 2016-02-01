@@ -151,7 +151,7 @@ isup() {
 	wget -q -O /tmp/isup http://downforeveryoneorjustme.com/$1
 	export check=`grep "Site is up." /tmp/isup`
 	if [[ -n $(grep "It's just you" /tmp/isup) ]]; then
-		echo -e "\e[00;32m[+]\e[00m It's up"   
+		echo -e "\e[00;32m[+]\e[00m It's up"
 		if [[ -n $(ping -c 2 $1) ]]; then
 			echo -e "\e[00;32m[+]\e[00m Got ping replay"
 		else
@@ -166,6 +166,10 @@ isup() {
 mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
 mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
 mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
+
+get_all_extensions () {
+    find . -name "*.$1" -exec cp -t $2 {} +
+}
 
 bashrc-update(){
     cd /tmp
@@ -183,7 +187,7 @@ bashrc-update(){
             echo "Not upgrading. \nQuiting now."
             echo "You can manually copy from /tmp/DamnUsefulBashrc.sh"
         fi
-        
+
     fi
 }
 
@@ -206,6 +210,8 @@ alias myip="`ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0
 alias what_am_i_doing="history | awk '{h[$2]++}END{for(i in h){print h[i],i|\"sort -rn|head -20\"}}' |awk '!max{max=$1;}{r=\"\";i=s=60*$1/max;while(i-->0)r=r"#";printf \"%15s %5d %s %s\",$2,$1,r,\"\n\";}'"
 alias get_ips="grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' "
 alias extip="curl 'http://myexternalip.com/raw'"
+alias copy_all="get_all_extensions $1 $2"        # This will allow copying of all file with particular extention to a directory.
+                                                 # Usage example: copy_all pdf /home/user/Desktop/folder
 
 PS1='\[\e[1;35m\]\u\[\e[m\] \[\e[1;36m\]\w\[\e[m\] \[\e[1;32m\]> \[\e[m\]\[\e[0;37m\]'
 PS2='>'
