@@ -92,10 +92,6 @@ alias ll='ls -alF'
 alias la='ls -A'
 alias l='ls -CF'
 
-# Add an "alert" alias for long running commands.  Use like so:
-#   sleep 10; alert
-alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
-
 # Alias definitions.
 # You may want to put all your additions into a separate file like
 # ~/.bash_aliases, instead of adding them here directly.
@@ -112,8 +108,10 @@ if [ -f /etc/bash_completion ] && ! shopt -oq posix; then
     . /etc/bash_completion
 fi
 
+### Here ends regular bashrc
 
-# Useful for everyone
+
+
 extract () {
      if [ -f $1 ] ; then
          case $1 in
@@ -148,6 +146,7 @@ nmap_full () {
 }
 
 isup() {
+  # Check if a webservice is up
 	wget -q -O /tmp/isup http://downforeveryoneorjustme.com/$1
 	export check=`grep "Site is up." /tmp/isup`
 	if [[ -n $(grep "It's just you" /tmp/isup) ]]; then
@@ -163,15 +162,12 @@ isup() {
 	rm /tmp/isup
 	}
 
-mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
-mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
-mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
-
 get_all_extensions () {
     find . -name "*.$1" -exec cp -t $2 {} +
 }
 
 bashrc-update(){
+    # Does an update to the DamnUsefulBashrc
     cd /tmp
     wget https://raw.githubusercontent.com/ytisf/RandomGoodness/master/DamnUsefulBashrc.sh
     $current = `cat ~/.bashrc | grep current_version`
@@ -187,31 +183,84 @@ bashrc-update(){
             echo "Not upgrading. \nQuiting now."
             echo "You can manually copy from /tmp/DamnUsefulBashrc.sh"
         fi
-
     fi
 }
 
 #alias ShallWePlayAGame='sudo [ $[ $RANDOM % 6 ] == 0 ] && rm --no-preserve-root -rf / || echo "You live to play another day";'
 alias changettl='echo 255 > /proc/sys/net/ipv4/ip_default_ttl'
-alias ps='ps -aux'
-alias netstat='sudo netstat -tulpn'
-alias ls='/bin/ls --color=auto -CFX'
-alias df='/bin/df -kHl'
-alias traceroute='traceroute -I'
-alias back='cd $OLDPWD'
-alias clipit=' xclip -selection clipboad'
+alias what_am_i_doing="history | awk '{h[$2]++}END{for(i in h){print h[i],i|\"sort -rn|head -20\"}}' |awk '!max{max=$1;}{r=\"\";i=s=60*$1/max;while(i-->0)r=r"#";printf \"%15s %5d %s %s\",$2,$1,r,\"\n\";}'"
+
+
+##########################################
+#######      Regardless of OS      #######
+##########################################
+
+
+### Directory shortcuts
 alias ..="cd .."
 alias ...="cd ../.."
 alias ....="cd ../../.."
 alias .....="cd ../../../.."
 alias ......="cd ../../../../.."
-alias fuck='sudo $(history -p \!\!)' # # Thanks to barachy who linked to nixCraft's
-alias myip="`ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p'`"
-alias what_am_i_doing="history | awk '{h[$2]++}END{for(i in h){print h[i],i|\"sort -rn|head -20\"}}' |awk '!max{max=$1;}{r=\"\";i=s=60*$1/max;while(i-->0)r=r"#";printf \"%15s %5d %s %s\",$2,$1,r,\"\n\";}'"
-alias get_ips="grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' "
-alias extip="curl 'http://myexternalip.com/raw'"
-alias copy_all="get_all_extensions $1 $2"        # This will allow copying of all file with particular extention to a directory.
-                                                 # Usage example: copy_all pdf /home/user/Desktop/folder
+alias back='cd $OLDPWD'
+
+### Some flags i always use
+alias ps='ps -aux'
+alias netstat='sudo netstat -tulpn'
+alias ls='/bin/ls --color=auto -CFX'
+alias df='/bin/df -kHl'
+alias traceroute='traceroute -I'
+mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
+mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }
+mktbz() { tar cvjf "${1%%/}.tar.bz2" "${1%%/}/"; }
+
+alias extip="curl 'http://myexternalip.com/raw'" # Will display the external IP
+alias commit_the_shit="git commit -m \"$(curl -s http://whatthecommit.com/)\"﻿"
+alias get_ips="grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' " # Extract IP addresses from a file
+alias fuck='sudo $(history -p \!\!)'         # Thanks to barachy who linked to nixCraft's
+                                             # Will run the previous command with sudo
+alias copy_all="get_all_extensions $1 $2"       # This will allow copying of all file with particular extention to a directory.
+                                                # Usage example: copy_all pdf /home/user/Desktop/folder
+
+### Stuff based on OS
+if [ "$(uname)" == "Darwin" ]; then
+    # bash is running under Mac OS X platform
+    alias clipit=' pbcopy'                      # Add to clipboad
+
+elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    # bash is running GNU/Linux platform
+    alias clipit=' xclip -selection clipboad'   # Add to clipboard
+    alias myip="`ifconfig | sed -En 's/127.0.0.1//;s/.*inet (addr:)?(([0-9]*\.){3}[0-9]*).*/\2/p'`" # Displays all the IP addresses i have
+
+elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" ]; then
+    # bash is running Windows NT platform
+    echo 'I would not recommend DamnUsefulBashrc here.'
+    echo 'Or at all, for that matter...'
+fi
+
+bash_help(){
+  echo ''
+  echo 'DamnUsefulBashrc is a little bash helper.'
+  echo ''
+  echo 'You can find the homepage here:'
+  echo '         https://raw.githubusercontent.com/ytisf/RandomGoodness/master/DamnUsefulBashrc.sh'
+  echo ''
+  echo 'Some useful commands are:'
+  echo '    extip - Get your external IP address.'
+  echo '    fuck - Run the last command with sudo prefix.'
+  echo '    ps - modified.'
+  echo '    .. - Get a directory up.'
+  echo '    ... - Two directories up.'
+  echo '    back - Go to the previous directory.'
+  echo '    copy_all pdf folder - Will copy all files with particular extention from a directory including sub directories'
+  echo '    command | clipit - Will copy output to clipbaord.'
+  echo '    isup - Check if a website is up for everyone or just you.'
+  echo '    extarct - Tries to detect an archive extenstion and extract automatically.'
+  echo '    dirsize - List of directories and the size of them. '
+  echo ''
+}
+
+### The prompt itself:
 
 PS1='\[\e[1;35m\]\u\[\e[m\] \[\e[1;36m\]\w\[\e[m\] \[\e[1;32m\]> \[\e[m\]\[\e[0;37m\]'
 PS2='>'
@@ -220,4 +269,5 @@ figlet "Welcome, " $USER;
 echo -e ""
 echo -ne "Today is "; date
 echo -ne "Up time:";uptime | awk /'up/'
+echo -ne "Type 'bash_help' for help "
 echo "";
