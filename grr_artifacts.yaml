@@ -1,0 +1,37 @@
+name: USBStor
+doc: All USB Connection History
+sources:
+- type: REGISTRY_KEY
+  attributes:
+    keys: ['%%current_control_set%%\Enum\USBSTOR\*']
+conditions: [os_major_version >= 6]
+labels: [Logs]
+supported_os: [Windows]
+---
+name: PreviousNetworks
+doc: Recovers previously connected networks' IPAddresses
+- type: REGISTRY_KEY
+  attributes:
+    keys: ['%%current_control_set%%\services\Tcpip\Parameters\Interfaces\*\IPAddress']
+    keys: ['%%current_control_set%%\services\Tcpip\Parameters\Interfaces\*\DhcpIPAddress]
+conditions: [os_major_version >= 6]
+labels: [Logs]
+supported_os: [Windows]
+---
+name: RunMRUs
+doc: List most used commands from registry
+- type: REGISTRY_KEY
+  attributes:
+    keys: ['HKEY_USERS\%%users.sid%%\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU']
+conditions: [os_major_version >= 6]
+labels: [Logs]
+supported_os: [Windows]
+---
+name: ComputersInLAN
+doc: List computer names on the same LAN
+- type: REGISTRY_KEY
+  attributes:
+    keys: ['HKEY_USERS\%%users.sid%%\Software\Microsoft\Windows\CurrentVersion\Explorer\ComputerDescriptions']
+conditions: [os_major_version >= 6]
+labels: [Logs]
+supported_os: [Windows]
