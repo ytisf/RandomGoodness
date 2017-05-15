@@ -35,3 +35,23 @@ doc: List computer names on the same LAN
 conditions: [os_major_version >= 6]
 labels: [Logs]
 supported_os: [Windows]
+---
+name: WaCrypter
+doc: This will try to detect files and registry keys dropped by WannaCrypt Ransomeware
+- type: REGISTRY_KEY
+  attributes:
+    keys: ['HKEY_LOCAL_MACHINE\Software\WanaCrypt0r',
+           'HKEY_LOCAL_MACHINE\Software\WanaCrypt0r\*'
+      ]
+- type: FILES
+  attributes:
+    files: [
+            'C:\TaskData\Tor\libeay32.dll',
+            'C:\m.vbs',
+            'C:\@Please_Read_Me@.txt',
+            'C:\TaskData\Tor\libevent-2-0-5.dll',
+            'C:\taskse.exe'
+    ]
+conditions: [os_major_version >= 6]
+labels: [Malware]
+supported_os: [Windows]
