@@ -75,20 +75,40 @@ xterm*|rxvt*)
     ;;
 esac
 
+unameOut="$(uname -s)"
+case "${unameOut}" in
+    Linux*)     machine=Linux;;
+    Darwin*)    machine=Mac;;
+    CYGWIN*)    machine=Cygwin;;
+    MINGW*)     machine=MinGw;;
+    *)          machine="UNKNOWN:${unameOut}"
+esac
+
 # enable color support of ls and also add handy aliases
 if [ -x /usr/bin/dircolors ]; then
     test -r ~/.dircolors && eval "$(dircolors -b ~/.dircolors)" || eval "$(dircolors -b)"
-    alias ls='ls --color=auto'
-    #alias dir='dir --color=auto'
-    #alias vdir='vdir --color=auto'
 
-    alias grep='grep --color=auto'
-    alias fgrep='fgrep --color=auto'
-    alias egrep='egrep --color=auto'
+    if [ machine == 'Mac' ]; then
+      alias ls='ls'
+      alias dir='ls'
+
+      alias grep='grep --color=auto'
+      alias fgrep='fgrep --color=auto'
+      alias egrep='egrep --color=auto'
+
+    elif [ machine == 'Linux' ]; then
+      alias ls='ls --color=auto'
+      alias dir='dir --color=auto'
+      alias vdir='vdir --color=auto'
+
+      alias grep='grep --color=auto'
+      alias fgrep='fgrep --color=auto'
+      alias egrep='egrep --color=auto'
+    fi
 fi
 
 # some more ls aliases
-alias ll='ls -alF'
+alias ll='ls -alFh'
 alias la='ls -A'
 alias l='ls -CF'
 
@@ -205,10 +225,20 @@ alias ......="cd ../../../../.."
 alias back='cd $OLDPWD'
 
 ### Some flags i always use
-alias ps='ps -aux'
-alias netstat='sudo netstat -tulpn'
-alias ls='/bin/ls --color=auto -CFX'
-alias df='/bin/df -kHl'
+# If Linux:
+if [ machine == 'Mac' ]; then
+  alias ps='ps -acwx'
+  alias netstat='sudo netstat -tulpn'
+  alias ls='/bin/ls --color=auto -CFX'
+  alias df='/bin/df -kHl'
+
+elif [ machine == 'Linux' ]; then
+  alias ps='ps -aux'
+  alias netstat='netstat -tln'
+  alias ls='/bin/ls -CFhl'
+  alias df='/bin/df -kHl'
+fi
+
 alias traceroute='traceroute -I'
 mktar() { tar cvf  "${1%%/}.tar"     "${1%%/}/"; }
 mktgz() { tar cvzf "${1%%/}.tar.gz"  "${1%%/}/"; }

@@ -11,8 +11,8 @@ if len(sys.argv) < 3 or len(sys.argv) > 3:
 
 # Open files for input and output
 try:
-    fi = open(sys.argv[1],'r')
-    fo = open(sys.argv[2],'w')
+    fi = open(sys.argv[1], 'r')
+    fo = open(sys.argv[2], 'w')
 
     # Prepare PCAP reader and writter
     pcapin = dpkt.pcap.Reader(fi)
