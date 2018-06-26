@@ -97,7 +97,7 @@ if [ -x /usr/bin/dircolors ]; then
       alias egrep='egrep --color=auto'
 
     elif [ machine == 'Linux' ]; then
-      alias ls='ls --color=auto'
+      alias ls='ls -alh --color=auto'
       alias dir='dir --color=auto'
       alias vdir='vdir --color=auto'
 
@@ -235,7 +235,6 @@ if [ machine == 'Mac' ]; then
 elif [ machine == 'Linux' ]; then
   alias ps='ps -aux'
   alias netstat='netstat -tln'
-  alias ls='/bin/ls -CFhl'
   alias df='/bin/df -kHl'
 fi
 

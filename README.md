@@ -20,7 +20,8 @@ A little script to help locating hosts on the net using arp-scan and then sendin
 Not mine but they are useful. Have a few features to add later on...
 ## CoprimeRandomnessCheck .py
 This is based on the fact that in any large set of numbers the distribution between cofactors and coprimes will `lim -> (6/(pi^2))`. Therefore, it will generate 10^6 `long` pairs between 0 and 10^9 and then put them in one of two buckets: coprime or cofactor. After that it will calculate `(6/(pi^2))` and try to evaluate how close they are. **NOT FOR CRYPTO!!!**
-
+## crysknife
+crysknife is a simple HTTP 'MiTM' tool. Its original purpose is to help detect malware compromised devices **after** a sinkhole has been created. Hence, nothing fancy or unique. Just want to have this at hand for later. It will save logs to a `recent.log` log file with the requests encoded into base64. 
 
 GPL 3
 ======
