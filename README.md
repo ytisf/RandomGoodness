@@ -5,6 +5,10 @@ This is just a repository of random useful scripts. Some i've written my self, s
 Scripts
 ==========
 
+## CrestronAirMediaRCE.py
+A file with various exploitations of the Crestron AirMedia's AM-100 and AM-101 to make it easier to exploit, utilize and network bridge various devices of this line. 
+
+
 ## GetNanoZip .sh
 Automatically downloads, installs and creates an alias within bashrc for nanozip archiving software.
 
@@ -33,7 +37,7 @@ This is based on the fact that in any large set of numbers the distribution betw
 crysknife is a simple HTTP 'MiTM' tool. Its original purpose is to help detect malware compromised devices **after** a sinkhole has been created. Hence, nothing fancy or unique. Just want to have this at hand for later. It will save logs to a `recent.log` log file with the requests encoded into base64.
 
 ## lazyGrab
-This one has some dependncies so its got its own folder. This one just runs over a target file with URLs/DomainNames/IPs and provides screenshots using selenium to save you guys time from manually reviewing nmap scans. 
+This one has some dependncies so its got its own folder. This one just runs over a target file with URLs/DomainNames/IPs and provides screenshots using selenium to save you guys time from manually reviewing nmap scans.
 
 
 GPL 3
