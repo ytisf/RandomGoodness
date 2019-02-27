@@ -6,8 +6,14 @@ Scripts
 ==========
 
 ## CrestronAirMediaRCE.py
-A file with various exploitations of the Crestron AirMedia's AM-100 and AM-101 to make it easier to exploit, utilize and network bridge various devices of this line. 
+A file with various exploitations of the Crestron AirMedia's AM-100 and AM-101 to make it easier to exploit, utilize and network bridge various devices of this line.
 
+## Collector.vbs
+An abnormal script here considering it's with VBS. This is just meant to collect basic information about a local machine (requires admin rights) which will get:
+
+* Running processes. (PID, PPID, execution path, privs, arguments, owner and hash)
+* Startup registry keys.
+* Active network connections (`netstat -an`).
 
 ## GetNanoZip .sh
 Automatically downloads, installs and creates an alias within bashrc for nanozip archiving software.
