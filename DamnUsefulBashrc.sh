@@ -267,6 +267,19 @@ elif [ "$(expr substr $(uname -s) 1 10)" == "MINGW32_NT" ]; then
     echo 'Or at all, for that matter...'
 fi
 
+### nmap NSE trick from (@ramen0x3f) https://twitter.com/ramen0x3f/status/1114181591394340864
+nmapversion="$(nmap -V)"
+REGEX_NMAP_VERSION='Version*'
+if [[ "$nmapversion" =~ ([[:digit:]]{1,2}\.[[:digit:]]{1,2}) ]]; then
+        nmap_current_ver=$BASH_REMATCH
+    if [ machine == 'Mac' ]; then
+      alias nse = 'ls -al /usr/share/nmap/scripts | grep '
+    elif [ machine == 'Linux' ]; then
+      alias nse = 'ls -al /usr/local/Cellar/nmap/$nmap_current_ver/share/nmap/scripts | grep '
+    fi
+fi
+
+
 bash_help(){
   echo ''
   echo 'DamnUsefulBashrc is a little bash helper.'
